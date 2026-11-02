@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Animation Studio (AI)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #1a1a1a; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; }
+  header { padding: 10px 16px; background: #252525; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header h1 .badge { font-size: 10px; background: #4a6fff; padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+  .export-buttons { display: flex; gap: 8px; align-items: center; }
+  .ai-toggle { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: #333; border-radius: 5px; font-size: 12px; cursor: pointer; user-select: none; }
+  .ai-toggle input { cursor: pointer; }
+  .ai-toggle.on { background: #2d6a4f; }
+  button { background: #4a6fff; color: white; border: none; padding: 7px 14px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 500; font-family: inherit; }
+  button:hover { background: #5a7fff; }
+  button.secondary { background: #333; }
+  button.secondary:hover { background: #444; }
+  button.small { padding: 4px 8px; font-size: 11px; }
+  main { flex: 1; display: flex; overflow: hidden; }
+  .panel { width: 300px; background: #222; padding: 12px; overflow-y: auto; border-right: 1px solid #333; flex-shrink: 0; }
+  .panel.right { border-right: none; border-left: 1px solid #333; width: 280px; }
+  .panel h2 { font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 10px; letter-spacing: 0.5px; }
+  .panel h3 { font-size: 11px; text-transform: uppercase; color: #888; margin: 16px 0 8px; letter-spacing: 0.5px; }
+  .prompt-box { display: flex; gap: 6px; margin-bottom: 8px; }
+  .prompt-box textarea { flex: 1; background: #1a1a1a; border: 1px solid #444; color: #e0e0e0; padding: 7px 10px; border-radius: 4px; font-size: 12px; font-family: inherit; resize: vertical; min-height: 70px; }
+  .prompt-box button { padding: 7px 10px; align-self: flex-start; }
+  .prompt-hint { font-size: 10px; color: #666; margin-bottom: 12px; line-height: 1.4; }
+  .prompt-hint code { background: #1a1a1a; padding: 1px 4px; border-radius: 2px; color: #4a6fff; font-size: 10px; }
+  .add-layer-row { display: flex; gap: 6px; margin-bottom: 12px; }
+  .add-layer-row select { flex: 1; background: #1a1a1a; border: 1px solid #444; color: #e0e0e0; padding: 7px; border-radius: 4px; font-size: 12px; font-family: inherit; }
+  .layer-list { display: flex; flex-direction: column; gap: 4px; }
+  .layer-item { display: flex; align-items: center; gap: 6px; padding: 8px; background: #2a2a2a; border: 1px solid #333; border-radius: 5px; cursor: pointer; font-size: 12px; }
+  .layer-item:hover { background: #333; }
+  .layer-item.active { background: #4a6fff; border-color: #4a6fff; }
+  .layer-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .layer-item .controls { display: flex; gap: 3px; }
+  .layer-item .controls button { background: transparent; padding: 2px 5px; font-size: 11px; }
+  .layer-item.active .controls button { background: rgba(255,255,255,0.15); }
+  .layer-item .controls button:hover { background: rgba(255,255,255,0.25); }
+  .empty-hint { color: #666; font-size: 12px; padding: 8px; text-align: center; font-style: italic; }
+  .preview-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; min-width: 0; background-color: #222; background-image: linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0; }
+  canvas { display: block; max-width: 100%; max-height: 65vh; width: auto; height: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+  .player-controls { display: flex; gap: 10px; align-items: center; margin-top: 12px; padding: 8px 16px; background: #252525; border-radius: 6px; }
+  .time-display { font-family: monospace; font-size: 12px; color: #888; min-width: 130px; text-align: center; }
+  .field { margin-bottom: 10px; }
+  .field label { display: block; font-size: 11px; color: #999; margin-bottom: 4px; }
+  .field input, .field select { width: 100%; background: #1a1a1a; border: 1px solid #333; color: #e0e0e0; padding: 6px 8px; border-radius: 4px; font-size: 12px; font-family: inherit; }
+  .field input[type="color"] { height: 30px; cursor: pointer; padding: 2px; }
+  .field input[type="checkbox"] { width: auto; }
+  .settings-box { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .status-bar { padding: 6px 16px; background: #252525; border-top: 1px solid #333; font-size: 11px; color: #888; text-align: center; flex-shrink: 0; }
+  .status-bar.thinking { background: #3a5a2a; color: #fff; }
+  .status-bar.error { background: #5a2a2a; color: #fff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎬 Animation Studio<span class="badge">AI</span></h1>
+  <div class="export-buttons">
+    <label class="ai-toggle" id="aiToggleWrap">
+      <input type="checkbox" id="aiToggle" checked>
+      <span>🤖 ИИ</span>
+    </label>
+    <button class="secondary" id="exportPng">PNG-последовательность</button>
+    <button id="exportWebm">WebM</button>
+  </div>
+</header>
+<main>
+  <aside class="panel">
+    <h2>✨ Опиши анимацию</h2>
+    <div class="prompt-box">
+      <textarea id="promptInput" placeholder="красный круг пульсирует в центре, через 2 секунды появляется заголовок 'Привет'"></textarea>
+      <button id="promptBtn" title="Создать">▶</button>
+    </div>
+    <div class="prompt-hint">
+      <code>красный круг слева пульсирует</code><br>
+      <code>через 1 сек появляется заголовок 'Новости'</code><br>
+      <code>график роста 20,45,30,60 и синяя звезда справа</code>
+    </div>
+
+    <h2>Слои</h2>
+    <div class="add-layer-row">
+      <select id="addLayerType">
+        <option value="title">📝 Заголовок</option>
+        <option value="lowerThird">📺 Плашка</option>
+        <option value="counter">🔢 Счётчик</option>
+        <option value="progressBar">📊 Прогресс</option>
+        <option value="diagram">🔀 Диаграмма</option>
+        <option value="chart">📈 График</option>
+        <option value="image">🖼 Изображение</option>
+        <option value="customShape">⬛ Фигура</option>
+      </select>
+      <button id="addLayerBtn" class="small">+</button>
+    </div>
+    <div class="layer-list" id="layerList"></div>
+
+    <h3>Настройки проекта</h3>
+    <div class="settings-box" id="projectSettings"></div>
+  </aside>
+
+  <div class="preview-area">
+    <canvas id="canvas"></canvas>
+    <div class="player-controls">
+      <button class="secondary" id="playBtn">▶ Воспроизвести</button>
+      <span class="time-display" id="timeDisplay">0.00 / 5.00 с</span>
+    </div>
+  </div>
+
+  <aside class="panel right">
+    <h2>Свойства слоя</h2>
+    <div id="properties"></div>
+  </aside>
+</main>
+<div class="status-bar" id="statusBar">Загрузка...</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ╔════════════════════════════════════════════════════════════════════╗
+// ║  ⚙️  ВАЖНО: ВСТАВЬ СЮДА АДРЕС СВОЕГО CLOUDFLARE WORKER             ║
+// ║  Пример: 'https://animation-ai-proxy.твой-аккаунт.workers.dev'      ║
+// ╚════════════════════════════════════════════════════════════════════╝
+const WORKER_URL = 'https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
+
+// ===== STATE =====
+const state = {
+  project: { width: 1920, height: 1080, fps: 30, duration: 5 },
+  layers: [],
+  selectedId: null,
+};
+let layerCounter = 1;
+let currentTime = 0, isPlaying = false, rafId = null, lastTime = 0;
+const imageCache = {};
+
+const uid = () => 'L' + (layerCounter++);
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const easeInOut = t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+
+const defaultProps = {
+  title: { text: 'Привет, YouTube!', color: '#ffffff' },
+  lowerThird: { text: 'Имя', subtext: 'Должность', color: '#ffffff', accentColor: '#4a6fff', bgColor: '#1a1a1a' },
+  counter: { number: 100, prefix: '', suffix: '', color: '#ffffff', accentColor: '#4a6fff' },
+  progressBar: { text: 'Загрузка', number: 100, color: '#ffffff', accentColor: '#4a6fff', bgColor: '#333333' },
+  diagram: { nodes: 'A,B,C', nodeColor: '#4a6fff', lineColor: '#ffffff', textColor: '#ffffff' },
+  chart: { title: 'График', data: '20,45,30,60,50,75', accentColor: '#4a6fff', color: '#ffffff', chartType: 'bar' },
+  image: { imageData: '', animation: 'fade' },
+  customShape: { shape: 'circle', color: '#4a6fff', size: 150, x: 0.5, y: 0.5, fadeIn: 0.3, fadeOut: 0.3, moveFrom: 'none', rotateSpeed: 0, pulse: false },
+};
+
+const layerNames = {
+  title: '📝 Заголовок', lowerThird: '📺 Плашка', counter: '🔢 Счётчик',
+  progressBar: '📊 Прогресс', diagram: '🔀 Диаграмма', chart: '📈 График',
+  image: '🖼 Изображение', customShape: '⬛ Фигура',
+};
+
+const fieldDefs = {
+  text: { label: 'Текст', type: 'text' }, subtext: { label: 'Подтекст', type: 'text' },
+  number: { label: 'Число', type: 'number' }, prefix: { label: 'Префикс', type: 'text' }, suffix: { label: 'Суффикс', type: 'text' },
+  color: { label: 'Цвет', type: 'color' }, accentColor: { label: 'Акцент', type: 'color' }, bgColor: { label: 'Фон', type: 'color' },
+  nodeColor: { label: 'Цвет узлов', type: 'color' }, lineColor: { label: 'Цвет линий', type: 'color' }, textColor: { label: 'Цвет текста', type: 'color' },
+  nodes: { label: 'Узлы (A,B,C)', type: 'text' }, data: { label: 'Данные (20,45,30)', type: 'text' }, title: { label: 'Заголовок', type: 'text' },
+  chartType: { label: 'Тип', type: 'select', options: [['bar','Столбцы'],['line','Линия']] },
+  shape: { label: 'Фигура', type: 'select', options: [['circle','Круг'],['rect','Квадрат'],['triangle','Треугольник'],['star','Звезда'],['line','Линия']] },
+  size: { label: 'Размер', type: 'number', min: 20, max: 600, step: 10 },
+  x: { label: 'Позиция X (0–1)', type: 'number', min: 0, max: 1, step: 0.05 },
+  y: { label: 'Позиция Y (0–1)', type: 'number', min: 0, max: 1, step: 0.05 },
+  fadeIn: { label: 'Появление (с)', type: 'number', min: 0, max: 2, step: 0.1 },
+  fadeOut: { label: 'Исчезновение (с)', type: 'number', min: 0, max: 2, step: 0.1 },
+  moveFrom: { label: 'Летит из', type: 'select', options: [['none','Нет'],['left','Слева'],['right','Справа'],['top','Сверху'],['bottom','Снизу']] },
+  rotateSpeed: { label: 'Вращение (°/с)', type: 'number', min: 0, max: 720, step: 30 },
+  pulse: { label: 'Пульсация', type: 'checkbox' },
+  animation: { label: 'Анимация', type: 'select', options: [['fade','Появление'],['zoom','Увеличение']] },
+  imageData: { label: 'Изображение', type: 'image' },
+};
+
+const layerFieldOrder = {
+  title: ['text','color','duration'], lowerThird: ['text','subtext','color','accentColor','bgColor','duration'],
+  counter: ['number','prefix','suffix','color','accentColor','duration'],
+  progressBar: ['text','number','color','accentColor','bgColor','duration'],
+  diagram: ['nodes','nodeColor','lineColor','textColor','duration'],
+  chart: ['title','data','chartType','color','accentColor','duration'],
+  image: ['imageData','animation','duration'],
+  customShape: ['shape','color','size','x','y','fadeIn','fadeOut','moveFrom','rotateSpeed','pulse','duration'],
+};
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  if (w < r*2) r = w/2;
+  ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+}
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = String(text).split(' '); const lines = []; let current = '';
+  for (const word of words) {
+    const test = current ? current + ' ' + word : word;
+    if (ctx.measureText(test).width > maxWidth && current) { lines.push(current); current = word; } else current = test;
+  }
+  if (current) lines.push(current);
+  const startY = y - (lines.length-1)*lineHeight/2;
+  lines.forEach((line, i) => ctx.fillText(line, x, startY + i * lineHeight));
+}
+function drawStar(ctx, cx, cy, points, outerR, innerR) {
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const angle = (Math.PI * i) / points - Math.PI/2;
+    const x = cx + Math.cos(angle) * r, y = cy + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+const renderers = {
+  title(ctx, p, t, dur) {
+    const fadeIn = Math.min(1, t/0.5), fadeOut = Math.min(1, (dur-t)/0.5);
+    const opacity = Math.max(0, Math.min(fadeIn, fadeOut));
+    const offsetY = (1 - easeOut(fadeIn)) * 40;
+    ctx.save(); ctx.globalAlpha = opacity; ctx.fillStyle = p.color;
+    ctx.font = 'bold 140px system-ui, Arial, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 20; ctx.shadowOffsetY = 4;
+    wrapText(ctx, p.text, state.project.width/2, state.project.height/2 + offsetY, state.project.width*0.85, 160);
+    ctx.restore();
+  },
+  lowerThird(ctx, p, t, dur) {
+    const slideIn = Math.min(1, t/0.4), slideOut = Math.min(1, (dur-t)/0.4);
+    const ease = easeOut(Math.min(slideIn, slideOut));
+    const baseX = 100, baseY = state.project.height - 280, offsetX = (1-ease)*-400;
+    const barW = 20, textW = 700, barH = 130;
+    ctx.save(); ctx.fillStyle = p.accentColor; ctx.fillRect(baseX+offsetX, baseY, barW, barH);
+    ctx.fillStyle = p.bgColor; ctx.globalAlpha = 0.92; ctx.fillRect(baseX+offsetX+barW, baseY, textW, barH);
+    ctx.globalAlpha = 1; ctx.fillStyle = p.color; ctx.font = 'bold 52px system-ui, Arial, sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(p.text, baseX+offsetX+barW+30, baseY+25);
+    ctx.fillStyle = p.accentColor; ctx.font = '32px system-ui, Arial, sans-serif';
+    ctx.fillText(p.subtext, baseX+offsetX+barW+30, baseY+88);
+    ctx.restore();
+  },
+  counter(ctx, p, t, dur) {
+    const progress = Math.min(1, Math.max(0, t/(dur*0.7)));
+    const eased = easeOut(progress); const value = Math.round(eased * p.number);
+    const display = p.prefix + value.toLocaleString('ru-RU') + p.suffix;
+    ctx.save(); ctx.globalAlpha = Math.min(1, t/0.3); ctx.fillStyle = p.color;
+    ctx.font = 'bold 220px system-ui, Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 6;
+    ctx.fillText(display, state.project.width/2, state.project.height/2);
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; ctx.fillStyle = p.accentColor;
+    const lw = 300 * eased;
+    ctx.fillRect(state.project.width/2 - lw/2, state.project.height/2 + 140, lw, 8);
+    ctx.restore();
+  },
+  progressBar(ctx, p, t, dur) {
+    const progress = Math.min(1, Math.max(0, t/(dur*0.75)));
+    const eased = easeInOut(progress); const percent = Math.round(eased * p.number);
+    ctx.save(); ctx.globalAlpha = Math.min(Math.min(1, t/0.3), Math.min(1, (dur-t)/0.3));
+    const barW = 900, barH = 24, x = (state.project.width-barW)/2, y = state.project.height/2+40;
+    ctx.fillStyle = p.color; ctx.font = 'bold 56px system-ui, Arial, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(p.text, state.project.width/2, y-30);
+    ctx.fillStyle = p.bgColor; ctx.beginPath(); roundRectPath(ctx, x, y, barW, barH, barH/2); ctx.fill();
+    ctx.fillStyle = p.accentColor; ctx.beginPath(); roundRectPath(ctx, x, y, barW*eased, barH, barH/2); ctx.fill();
+    ctx.fillStyle = p.color; ctx.font = 'bold 40px system-ui, Arial, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(percent+'%', state.project.width/2, y+barH+20);
+    ctx.restore();
+  },
+  diagram(ctx, p, t, dur) {
+    const nodes = String(p.nodes).split(',').map(s => s.trim()).filter(Boolean);
+    const n = nodes.length; if (!n) return;
+    const spacing = Math.min(300, (state.project.width*0.8)/n);
+    const startX = state.project.width/2 - (n-1)*spacing/2, cy = state.project.height/2, r = 60;
+    const nodesDur = dur * 0.5, linesStart = nodesDur * 0.7;
+    ctx.save(); ctx.strokeStyle = p.lineColor; ctx.lineWidth = 4;
+    for (let i = 0; i < n-1; i++) {
+      const lineT = Math.max(0, Math.min(1, (t - linesStart - i*0.1)/(dur*0.3)));
+      if (lineT <= 0) continue;
+      const x1 = startX + i*spacing + r, x2 = startX + (i+1)*spacing - r;
+      ctx.beginPath(); ctx.moveTo(x1, cy); ctx.lineTo(x1 + (x2-x1)*lineT, cy); ctx.stroke();
+    }
+    for (let i = 0; i < n; i++) {
+      const nodeT = Math.max(0, Math.min(1, (t - i*0.15)/0.3));
+      if (nodeT <= 0) continue;
+      const sc = easeOut(nodeT);
+      ctx.save(); ctx.globalAlpha = nodeT; ctx.translate(startX+i*spacing, cy); ctx.scale(sc, sc);
+      ctx.fillStyle = p.nodeColor; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = p.textColor; ctx.font = 'bold 32px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(nodes[i], 0, 0); ctx.restore();
+    }
+    ctx.restore();
+  },
+  chart(ctx, p, t, dur) {
+    const data = String(p.data).split(',').map(s => parseFloat(s.trim())).filter(v => !isNaN(v));
+    const n = data.length; if (!n) return;
+    const max = Math.max(...data, 1);
+    const chartW = state.project.width*0.7, chartH = state.project.height*0.5;
+    const x0 = (state.project.width-chartW)/2, y0 = state.project.height/2 - chartH/2 + 60;
+    ctx.save(); ctx.fillStyle = p.color; ctx.font = 'bold 56px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(p.title, state.project.width/2, y0-100);
+    if (p.chartType === 'bar') {
+      const barW = chartW/n*0.7, gap = chartW/n*0.3;
+      for (let i = 0; i < n; i++) {
+        const bt = Math.max(0, Math.min(1, (t-i*0.1)/0.6));
+        const h = (data[i]/max)*chartH*easeOut(bt);
+        const x = x0 + i*(barW+gap) + gap/2, y = y0 + chartH - h;
+        ctx.fillStyle = p.accentColor; ctx.fillRect(x, y, barW, h);
+        if (bt > 0.5) {
+          ctx.fillStyle = p.color; ctx.font = '24px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+          ctx.globalAlpha = (bt-0.5)*2; ctx.fillText(data[i], x+barW/2, y-5); ctx.globalAlpha = 1;
+        }
+      }
+    } else {
+      const stepX = chartW/Math.max(1,n-1);
+      const pts = data.map((v,i) => ({x: x0+i*stepX, y: y0+chartH-(v/max)*chartH}));
+      const lineT = Math.min(1, t/(dur*0.7));
+      const upto = Math.floor(lineT*(n-1));
+      ctx.strokeStyle = p.accentColor; ctx.lineWidth = 5; ctx.beginPath();
+      for (let i = 0; i <= upto; i++) { if (i===0) ctx.moveTo(pts[i].x, pts[i].y); else ctx.lineTo(pts[i].x, pts[i].y); }
+      if (upto < n-1) {
+        const frac = (lineT*(n-1))-upto, pA = pts[upto], pB = pts[upto+1];
+        ctx.lineTo(pA.x+(pB.x-pA.x)*frac, pA.y+(pB.y-pA.y)*frac);
+      }
+      ctx.stroke();
+      for (let i = 0; i <= upto; i++) {
+        ctx.fillStyle = p.accentColor; ctx.beginPath(); ctx.arc(pts[i].x, pts[i].y, 8, 0, Math.PI*2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  },
+  image(ctx, p, t, dur, layer) {
+    const img = imageCache[layer.id];
+    if (!img || !img.complete || !img.naturalWidth) return;
+    const opacity = Math.max(0, Math.min(1, Math.min(t/0.4, (dur-t)/0.4)));
+    const maxW = state.project.width*0.8, maxH = state.project.height*0.8;
+    let w = img.naturalWidth, h = img.naturalHeight;
+    const sc = Math.min(maxW/w, maxH/h, 1); w *= sc; h *= sc;
+    let zoom = 1; if (p.animation === 'zoom') zoom = 0.5 + 0.5*easeOut(Math.min(1, t/0.5));
+    ctx.save(); ctx.globalAlpha = opacity;
+    ctx.translate(state.project.width/2, state.project.height/2); ctx.scale(zoom, zoom);
+    ctx.drawImage(img, -w/2, -h/2, w, h); ctx.restore();
+  },
+  customShape(ctx, p, t, dur) {
+    const W = state.project.width, H = state.project.height;
+    const fin = p.fadeIn > 0 ? Math.min(1, t/p.fadeIn) : 1;
+    const fout = p.fadeOut > 0 ? Math.min(1, (dur-t)/p.fadeOut) : 1;
+    const opacity = Math.max(0, Math.min(fin, fout));
+    let px = p.x*W, py = p.y*H;
+    if (p.moveFrom && p.moveFrom !== 'none') {
+      const moveDur = Math.min(1.2, dur*0.4);
+      const prog = easeOut(Math.min(1, t/moveDur));
+      const dist = W*1.5;
+      if (p.moveFrom === 'left') px = -dist/2 + (p.x*W + dist/2)*prog;
+      if (p.moveFrom === 'right') px = W + dist/2 - (W - p.x*W + dist/2)*prog;
+      if (p.moveFrom === 'top') py = -dist/2 + (p.y*H + dist/2)*prog;
+      if (p.moveFrom === 'bottom') py = H + dist/2 - (H - p.y*H + dist/2)*prog;
+    }
+    const rot = (p.rotateSpeed * t * Math.PI) / 180;
+    let sc = 1; if (p.pulse) sc = 1 + 0.15*Math.sin(t*Math.PI*2);
+    ctx.save(); ctx.globalAlpha = opacity; ctx.translate(px, py); ctx.rotate(rot); ctx.scale(sc, sc);
+    ctx.fillStyle = p.color;
+    const s = p.size;
+    if (p.shape === 'circle') { ctx.beginPath(); ctx.arc(0,0,s/2,0,Math.PI*2); ctx.fill(); }
+    else if (p.shape === 'rect') { ctx.fillRect(-s/2, -s/2, s, s); }
+    else if (p.shape === 'triangle') { ctx.beginPath(); ctx.moveTo(0,-s/2); ctx.lineTo(s/2,s/2); ctx.lineTo(-s/2,s/2); ctx.closePath(); ctx.fill(); }
+    else if (p.shape === 'star') { drawStar(ctx, 0, 0, 5, s/2, s/4); ctx.fill(); }
+    else if (p.shape === 'line') { ctx.fillRect(-s, -3, s*2, 6); }
+    ctx.restore();
+  },
+};
+
+function createLayer(type, customProps) {
+  const props = { ...(defaultProps[type] || {}), ...(customProps || {}) };
+  const layer = { id: uid(), type, name: layerNames[type] || type, startTime: 0, duration: props.duration || 3, props };
+  delete layer.props.duration;
+  return layer;
+}
+function addLayer(type) {
+  const layer = createLayer(type);
+  state.layers.push(layer); state.selectedId = layer.id;
+  renderLayerList(); renderProperties(); updatePreview();
+}
+function removeLayer(id) {
+  state.layers = state.layers.filter(l => l.id !== id);
+  if (state.selectedId === id) state.selectedId = state.layers[0]?.id || null;
+  delete imageCache[id];
+  renderLayerList(); renderProperties(); updatePreview();
+}
+function moveLayer(id, dir) {
+  const idx = state.layers.findIndex(l => l.id === id); if (idx < 0) return;
+  const ni = idx + dir; if (ni < 0 || ni >= state.layers.length) return;
+  [state.layers[idx], state.layers[ni]] = [state.layers[ni], state.layers[idx]];
+  renderLayerList(); updatePreview();
+}
+function getSelected() { return state.layers.find(l => l.id === state.selectedId); }
+
+// ===== LOCAL PARSER (fallback) =====
+const colorMap = [
+  [/красн|red/, '#ff4444'], [/син|blue/, '#4466ff'], [/зел[её]н|green/, '#44ff88'],
+  [/ж[её]лт|yellow/, '#ffcc00'], [/оранж|orange/, '#ff8844'], [/фиолет|purple/, '#aa44ff'],
+  [/розов|pink/, '#ff66aa'], [/бел|white/, '#ffffff'], [/ч[её]рн|black/, '#000000'],
+];
+function parseSingleSegment(seg) {
+  const cfg = { shape: 'circle', color: '#4a6fff', size: 150, x: 0.5, y: 0.5, fadeIn: 0.3, fadeOut: 0.3, moveFrom: 'none', rotateSpeed: 0, pulse: false, duration: 3 };
+  if (/круг|circle|окружн/.test(seg)) cfg.shape = 'circle';
+  else if (/квадрат|прямоуголь|square|rect/.test(seg)) cfg.shape = 'rect';
+  else if (/треуголь|triangle/.test(seg)) cfg.shape = 'triangle';
+  else if (/звезд|star/.test(seg)) cfg.shape = 'star';
+  else if (/лини|line|черт/.test(seg)) { cfg.shape = 'line'; cfg.size = 200; }
+  else if (/точк|dot|кружоч/.test(seg)) { cfg.shape = 'circle'; cfg.size = 60; }
+  for (const [pat, col] of colorMap) { if (pat.test(seg)) { cfg.color = col; break; } }
+  if (/в центре|по центру|центр|center/.test(seg)) { cfg.x = 0.5; cfg.y = 0.5; }
+  else if (/слева|left/.test(seg) && !/слева направо|справа налево/.test(seg)) cfg.x = 0.2;
+  else if (/справа|right/.test(seg) && !/слева направо|справа налево/.test(seg)) cfg.x = 0.8;
+  if (/сверху|top|вверху/.test(seg)) cfg.y = 0.2;
+  else if (/снизу|bottom|внизу/.test(seg)) cfg.y = 0.8;
+  if (/слева направо|left to right|вправо/.test(seg) && /летит|движ|въезж|едет|мчится/.test(seg)) cfg.moveFrom = 'left';
+  else if (/справа налево|right to left|влево/.test(seg) && /летит|движ|въезж|едет|мчится/.test(seg)) cfg.moveFrom = 'right';
+  else if (/сверху вниз|top to bottom|падает/.test(seg)) cfg.moveFrom = 'top';
+  else if (/снизу вверх|bottom to top|взлетает/.test(seg)) cfg.moveFrom = 'bottom';
+  else if (/слева|left/.test(seg) && /летит|движ|въезж/.test(seg)) cfg.moveFrom = 'left';
+  else if (/справа|right/.test(seg) && /летит|движ|въезж/.test(seg)) cfg.moveFrom = 'right';
+  if (/враща|rotat|крутится|вертится/.test(seg)) cfg.rotateSpeed = /быстр/.test(seg) ? 360 : 180;
+  if (/пульсир|puls|дышит|бьётся|бьется|мигает/.test(seg)) cfg.pulse = true;
+  const sz = seg.match(/(\d+)\s*(px|пикс)/); if (sz) cfg.size = Math.min(600, Math.max(20, parseInt(sz[1])));
+  const dm = seg.match(/(\d+([.,]\d+)?)\s*(сек|s\b|секунд)/); if (dm) cfg.duration = Math.min(30, Math.max(0.5, parseFloat(dm[1].replace(',', '.'))));
+  return cfg;
+}
+function parsePromptLocal(prompt) {
+  const p = String(prompt).toLowerCase().trim(); if (!p) return [];
+  const segs = p.split(/\s+и\s+|,\s*/).filter(Boolean);
+  const result = [];
+  for (const s of segs) { if (s.length >= 2) result.push(parseSingleSegment(s)); }
+  if (!result.length) result.push(parseSingleSegment(p));
+  return result;
+}
+
+// ===== AI LAYER CONVERTER =====
+function aiLayerToInternal(ai) {
+  const base = { startTime: ai.startTime || 0, duration: ai.duration || 3 };
+  const p = ai || {};
+  switch (p.type) {
+    case 'customShape': return { ...base, type: 'customShape', props: { shape: p.shape || 'circle', color: p.color || '#4a6fff', size: p.size ?? 150, x: p.x ?? 0.5, y: p.y ?? 0.5, fadeIn: p.fadeIn ?? 0.3, fadeOut: p.fadeOut ?? 0.3, moveFrom: p.moveFrom || 'none', rotateSpeed: p.rotateSpeed || 0, pulse: !!p.pulse } };
+    case 'title': return { ...base, type: 'title', props: { text: p.text || '', color: p.color || '#ffffff' } };
+    case 'lowerThird': return { ...base, type: 'lowerThird', props: { text: p.text || '', subtext: p.subtext || '', color: p.color || '#ffffff', accentColor: p.accentColor || '#4a6fff', bgColor: p.bgColor || '#1a1a1a' } };
+    case 'counter': return { ...base, type: 'counter', props: { number: p.number || 0, prefix: p.prefix || '', suffix: p.suffix || '', color: p.color || '#ffffff', accentColor: p.accentColor || '#4a6fff' } };
+    case 'progressBar': return { ...base, type: 'progressBar', props: { text: p.text || '', number: p.number || 0, color: p.color || '#ffffff', accentColor: p.accentColor || '#4a6fff', bgColor: p.bgColor || '#333333' } };
+    case 'diagram': return { ...base, type: 'diagram', props: { nodes: p.nodes || 'A,B,C', nodeColor: p.nodeColor || '#4a6fff', lineColor: p.lineColor || '#ffffff', textColor: p.textColor || '#ffffff' } };
+    case 'chart': return { ...base, type: 'chart', props: { title: p.title || '', data: p.data || '', chartType: p.chartType || 'bar', color: p.color || '#ffffff', accentColor: p.accentColor || '#4a6fff' } };
+    case 'image': return { ...base, type: 'image', props: { imageData: '', animation: 'fade' } };
+    default: return null;
+  }
+}
+
+// ===== MAIN PROMPT HANDLER =====
+async function addFromPrompt() {
+  const input = document.getElementById('promptInput');
+  const prompt = input.value.trim();
+  if (!prompt) return;
+  const status = document.getElementById('statusBar');
+  const aiOn = document.getElementById('aiToggle').checked;
+
+  if (aiOn && WORKER_URL && !WORKER_URL.includes('YOUR-WORKER')) {
+    status.textContent = '🤖 ИИ думает...'; status.className = 'status-bar thinking';
+    try {
+      const resp = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) throw new Error(data.error || 'Ошибка запроса');
+      if (!data.layers || !data.layers.length) throw new Error('ИИ вернул пустой ответ');
+      const newLayers = data.layers.map(ai => {
+        const internal = aiLayerToInternal(ai);
+        if (!internal) return null;
+        const layer = createLayer(internal.type, internal.props);
+        layer.startTime = internal.startTime;
+        layer.duration = internal.duration;
+        layer.name = '🤖 ' + (layerNames[internal.type] || internal.type).replace(/^[^\s]+\s/, '');
+        return layer;
+      }).filter(Boolean);
+      state.layers.push(...newLayers);
+      state.selectedId = newLayers[newLayers.length-1].id;
+      input.value = '';
+      renderLayerList(); renderProperties(); updatePreview();
+      status.textContent = `✅ ИИ создал ${newLayers.length} слоёв`; status.className = 'status-bar';
+      setTimeout(() => { if (status.textContent.startsWith('✅')) { status.textContent = 'Готово'; status.className = 'status-bar'; } }, 3000);
+      return;
+    } catch (e) {
+      status.textContent = '⚠️ ИИ не справился: ' + e.message + '. Пробую локальный парсер...';
+      status.className = 'status-bar error';
+      setTimeout(() => { status.textContent = 'Готово'; status.className = 'status-bar'; }, 5000);
+    }
+  }
+
+  // Local fallback
+  const configs = parsePromptLocal(prompt);
+  const newLayers = configs.map(cfg => {
+    const layer = createLayer('customShape', cfg);
+    layer.duration = cfg.duration;
+    layer.name = '✨ Фигура';
+    return layer;
+  });
+  state.layers.push(...newLayers);
+  state.selectedId = newLayers[newLayers.length-1].id;
+  input.value = '';
+  renderLayerList(); renderProperties(); updatePreview();
+}
+
+function renderLayerList() {
+  const list = document.getElementById('layerList'); list.innerHTML = '';
+  if (!state.layers.length) { list.innerHTML = '<div class="empty-hint">Слоёв пока нет. Опиши анимацию сверху или добавь из списка.</div>'; return; }
+  state.layers.forEach(layer => {
+    const div = document.createElement('div');
+    div.className = 'layer-item' + (layer.id === state.selectedId ? ' active' : '');
+    div.onclick = (e) => { if (e.target.closest('button')) return; state.selectedId = layer.id; renderLayerList(); renderProperties(); };
+    const name = document.createElement('span'); name.className = 'name'; name.textContent = layer.name; div.appendChild(name);
+    const ctrl = document.createElement('div'); ctrl.className = 'controls';
+    const up = document.createElement('button'); up.textContent = '⬆'; up.onclick = () => moveLayer(layer.id, 1);
+    const dn = document.createElement('button'); dn.textContent = '⬇'; dn.onclick = () => moveLayer(layer.id, -1);
+    const del = document.createElement('button'); del.textContent = '🗑'; del.onclick = () => { if (confirm('Удалить слой?')) removeLayer(layer.id); };
+    ctrl.appendChild(up); ctrl.appendChild(dn); ctrl.appendChild(del); div.appendChild(ctrl);
+    list.appendChild(div);
+  });
+}
+
+function renderProperties() {
+  const panel = document.getElementById('properties'); panel.innerHTML = '';
+  const layer = getSelected();
+  if (!layer) { panel.innerHTML = '<div class="empty-hint">Выбери слой слева.</div>'; return; }
+  const h0 = document.createElement('h3'); h0.textContent = 'Тайминг'; h0.style.marginTop = '0'; panel.appendChild(h0);
+  addField(panel, 'Начало (сек)', 'number', layer.startTime, v => { layer.startTime = v; updatePreview(); }, {min:0,max:60,step:0.1});
+  addField(panel, 'Длительность (сек)', 'number', layer.duration, v => { layer.duration = v; updatePreview(); }, {min:0.5,max:60,step:0.1});
+  const h1 = document.createElement('h3'); h1.textContent = 'Свойства'; panel.appendChild(h1);
+  const fields = layerFieldOrder[layer.type] || [];
+  for (const key of fields) {
+    if (key === 'duration') continue;
+    const def = fieldDefs[key]; if (!def) continue;
+    addField(panel, def.label, def.type, layer.props[key], v => {
+      layer.props[key] = v;
+      if (key === 'imageData') { const img = new Image(); img.onload = () => { imageCache[layer.id] = img; updatePreview(); }; img.src = v; }
+      updatePreview();
+    }, def);
+  }
+}
+
+function addField(parent, label, type, value, onChange, opts = {}) {
+  const div = document.createElement('div'); div.className = 'field';
+  const lbl = document.createElement('label'); lbl.textContent = label; div.appendChild(lbl);
+  let input;
+  if (type === 'select') {
+    input = document.createElement('select');
+    for (const [v, t] of opts.options || []) { const o = document.createElement('option'); o.value = v; o.textContent = t; input.appendChild(o); }
+    input.value = value; input.onchange = e => onChange(e.target.value);
+  } else if (type === 'checkbox') {
+    input = document.createElement('input'); input.type = 'checkbox'; input.checked = !!value;
+    input.onchange = e => onChange(e.target.checked);
+  } else if (type === 'image') {
+    input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*';
+    input.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => onChange(ev.target.result); r.readAsDataURL(f); };
+  } else {
+    input = document.createElement('input'); input.type = type;
+    if (opts.min !== undefined) input.min = opts.min; if (opts.max !== undefined) input.max = opts.max; if (opts.step !== undefined) input.step = opts.step;
+    input.value = value;
+    input.oninput = e => { let v = e.target.value; if (type === 'number') v = parseFloat(v) || 0; onChange(v); };
+  }
+  div.appendChild(input); parent.appendChild(div);
+}
+
+function renderProjectSettings() {
+  const box = document.getElementById('projectSettings'); box.innerHTML = '';
+  addField(box, 'Ширина', 'number', state.project.width, v => { state.project.width = v; resizeCanvas(); updatePreview(); }, {min:320,max:3840,step:2});
+  addField(box, 'Высота', 'number', state.project.height, v => { state.project.height = v; resizeCanvas(); updatePreview(); }, {min:240,max:2160,step:2});
+  addField(box, 'FPS', 'number', state.project.fps, v => { state.project.fps = v; }, {min:10,max:60,step:1});
+  addField(box, 'Длительность (с)', 'number', state.project.duration, v => { state.project.duration = v; }, {min:1,max:60,step:0.5});
+}
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { alpha: true });
+function resizeCanvas() { canvas.width = state.project.width; canvas.height = state.project.height; }
+function renderAll() {
+  ctx.clearRect(0, 0, state.project.width, state.project.height);
+  for (const layer of state.layers) {
+    const localT = currentTime - layer.startTime;
+    if (localT < 0 || localT > layer.duration) continue;
+    const r = renderers[layer.type]; if (r) r(ctx, layer.props, localT, layer.duration, layer);
+  }
+}
+function updatePreview() {
+  renderAll();
+  document.getElementById('timeDisplay').textContent = currentTime.toFixed(2) + ' / ' + state.project.duration.toFixed(2) + ' с';
+}
+function play() {
+  if (isPlaying) { isPlaying = false; cancelAnimationFrame(rafId); document.getElementById('playBtn').textContent = '▶ Воспроизвести'; return; }
+  isPlaying = true; document.getElementById('playBtn').textContent = '⏸ Пауза';
+  currentTime = 0; lastTime = performance.now();
+  function loop(now) {
+    if (!isPlaying) return;
+    currentTime += (now - lastTime)/1000; lastTime = now;
+    if (currentTime >= state.project.duration) { currentTime = state.project.duration; updatePreview(); isPlaying = false; document.getElementById('playBtn').textContent = '▶ Воспроизвести'; return; }
+    updatePreview(); rafId = requestAnimationFrame(loop);
+  }
+  rafId = requestAnimationFrame(loop);
+}
+
+async function exportWebM() {
+  const status = document.getElementById('statusBar');
+  status.textContent = 'Рендер WebM... не закрывай вкладку.'; status.className = 'status-bar';
+  const oldTime = currentTime; currentTime = 0; renderAll();
+  const stream = canvas.captureStream(state.project.fps);
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+  const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 25000000 });
+  const chunks = []; rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  const done = new Promise(r => rec.onstop = () => r(new Blob(chunks, { type: 'video/webm' })));
+  rec.start();
+  const total = Math.ceil(state.project.duration*state.project.fps), fm = 1000/state.project.fps;
+  for (let f = 0; f < total; f++) { currentTime = f/state.project.fps; renderAll(); await new Promise(r => setTimeout(r, fm)); }
+  rec.stop(); const blob = await done;
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = 'animation-' + Date.now() + '.webm'; a.click(); URL.revokeObjectURL(url);
+  currentTime = oldTime; updatePreview(); status.textContent = '✓ WebM готов.';
+}
+
+async function exportPng() {
+  const status = document.getElementById('statusBar'); status.textContent = 'Рендер PNG...'; status.className = 'status-bar';
+  const zip = new JSZip();
+  const total = Math.ceil(state.project.duration*state.project.fps), pad = String(total).length;
+  const oldTime = currentTime;
+  for (let f = 0; f < total; f++) {
+    currentTime = f/state.project.fps; renderAll();
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    zip.file('frame_' + String(f).padStart(pad, '0') + '.png', await blob.arrayBuffer());
+    if (f % 5 === 0) { status.textContent = `Рендер PNG... ${f}/${total}`; await new Promise(r => setTimeout(r, 0)); }
+  }
+  status.textContent = 'Упаковка ZIP...';
+  const zblob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(zblob); const a = document.createElement('a');
+  a.href = url; a.download = 'animation-frames-' + Date.now() + '.zip'; a.click(); URL.revokeObjectURL(url);
+  currentTime = oldTime; updatePreview(); status.textContent = '✓ PNG готов. В Resolve: File → Import → Media.';
+}
+
+document.getElementById('playBtn').onclick = play;
+document.getElementById('exportWebm').onclick = exportWebM;
+document.getElementById('exportPng').onclick = exportPng;
+document.getElementById('addLayerBtn').onclick = () => addLayer(document.getElementById('addLayerType').value);
+document.getElementById('promptBtn').onclick = addFromPrompt;
+document.getElementById('promptInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addFromPrompt(); } });
+document.getElementById('aiToggle').addEventListener('change', e => {
+  document.getElementById('aiToggleWrap').classList.toggle('on', e.target.checked);
+});
+
+document.getElementById('aiToggleWrap').classList.add('on');
+document.getElementById('statusBar').textContent = '✓ Готово. Опиши анимацию и жми ▶';
+
+resizeCanvas(); renderLayerList(); renderProperties(); renderProjectSettings(); updatePreview();
+state.layers.push(createLayer('title')); state.selectedId = state.layers[0].id;
+renderLayerList(); renderProperties(); updatePreview();
+</script>
+</body>
+</html>
